@@ -1,6 +1,7 @@
 import { generateWebsite } from '../lib/ai-generator'
 import { deploySite } from '../lib/site-deployer'
-import { sendDeploymentNotification } from '../lib/resend'
+import { sendDeploymentNotification, sendWelcomeEmail } from '../lib/resend'
+import { createEmailAccounts } from '../lib/directadmin'
 import { log } from '../lib/logger'
 import { prisma } from '../lib/prisma'
 
@@ -51,18 +52,27 @@ async function processNextSite() {
       },
     })
 
+    // Deploy (remote DA/FTP or local Nginx fallback)
     const { deployPath, siteUrl } = await deploySite({
       businessName: lead.businessName,
       html,
       leadId: lead.id,
+      domainSuggested: lead.domainSuggested,
     })
+
+    // Reload lead to get any domain/DA credential updates written by deploySite
+    const updatedLead = await prisma.lead.findUnique({ where: { id: lead.id } })
+    if (!updatedLead) {
+      throw new Error(`Lead ${lead.id} disappeared during deployment`)
+    }
+    const finalDomain = updatedLead.domainSuggested ?? lead.domainSuggested
 
     await prisma.generatedSite.update({
       where: { id: site.id },
       data: {
         deployPath,
         siteUrl,
-        domain: lead.domainSuggested ?? null,
+        domain: finalDomain ?? null,
         status: 'DEPLOYED',
         deployedAt: new Date(),
       },
@@ -73,10 +83,49 @@ async function processNextSite() {
       data: { status: 'SITE_DEPLOYED' },
     })
 
+    // -------------------------------------------------------------------
+    // Email account provisioning (only when DA credentials are available)
+    // -------------------------------------------------------------------
+    let provisionedEmailAccounts: Array<{ address: string; password: string }> = []
+
+    const daUser = updatedLead?.directadminUsername
+    if (daUser && finalDomain && lead.requestedEmailPrefixes.length > 0) {
+      provisionedEmailAccounts = await createEmailAccounts(
+        daUser,
+        finalDomain,
+        lead.requestedEmailPrefixes
+      )
+
+      // Persist only the addresses (not passwords) to the database
+      if (provisionedEmailAccounts.length > 0) {
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: {
+            provisionedEmails: provisionedEmailAccounts.map((e) => e.address),
+          },
+        })
+      }
+    }
+
+    // -------------------------------------------------------------------
+    // Send welcome + credentials email to client
+    // -------------------------------------------------------------------
+    if (lead.email && finalDomain) {
+      await sendWelcomeEmail({
+        toEmail: lead.email,
+        businessName: lead.businessName,
+        siteUrl,
+        domain: finalDomain,
+        emailAccounts: provisionedEmailAccounts,
+      })
+    }
+
+    // Notify admin
     await sendDeploymentNotification(lead.id, siteUrl)
 
     await log('info', 'generator', `Site deployed for ${lead.businessName}: ${siteUrl}`, {
       leadId: lead.id,
+      emailsProvisioned: provisionedEmailAccounts.length,
     })
   } catch (err) {
     await prisma.generatedSite.update({
