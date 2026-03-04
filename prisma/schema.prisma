@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  name          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Lead {
+  id              String      @id @default(cuid())
+  businessName    String
+  address         String?
+  phoneNumber     String?
+  googleMapsLink  String?
+  placeId         String?     @unique
+  category        String?
+  hasWebsite      Boolean     @default(false)
+  websiteUrl      String?
+  email           String?
+  emailSource     String?
+  emailFound      Boolean     @default(false)
+  manualFollowUp  Boolean     @default(false)
+
+  status          LeadStatus     @default(NEW)
+  outreachStatus  OutreachStatus @default(PENDING)
+
+  domainSuggested     String?
+  domainAvailable     Boolean?
+
+  subscriptionId      String?
+  subscriptionStatus  SubscriptionStatus @default(NONE)
+  monthlyFee          Decimal?           @db.Decimal(10, 2)
+
+  // Theory7 / DirectAdmin hosting identifiers (no raw passwords)
+  directadminUsername    String?
+  directadminServerIp    String?
+  directadminPasswordEnc String?   // AES-256-GCM encrypted
+
+  // Email provisioning
+  requestedEmailPrefixes String[]  @default([])
+  provisionedEmails      String[]  @default([])
+
+  payment         Payment?
+  generatedSite   GeneratedSite?
+  outreachLogs    OutreachLog[]
+
+  scanBatchId     String?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  leadId          String        @unique
+  lead            Lead          @relation(fields: [leadId], references: [id])
+
+  molliePaymentId      String?       @unique
+  stripePaymentId      String?       @unique
+  mollieCustomerId     String?
+  mollieSubscriptionId String?
+
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("EUR")
+  status          PaymentStatus @default(PENDING)
+
+  checkoutUrl     String?
+
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model GeneratedSite {
+  id              String      @id @default(cuid())
+  leadId          String      @unique
+  lead            Lead        @relation(fields: [leadId], references: [id])
+
+  domain          String?
+  deployPath      String
+  siteUrl         String
+
+  aiModel         String?
+  aiPrompt        String?     @db.Text
+  generatedHtml   String?     @db.Text
+
+  status          SiteStatus  @default(PENDING)
+
+  deployedAt      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model OutreachLog {
+  id          String   @id @default(cuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id])
+
+  emailTo     String
+  subject     String
+  body        String   @db.Text
+
+  resendId    String?
+  status      String
+
+  sentAt      DateTime @default(now())
+}
+
+model SystemLog {
+  id          String   @id @default(cuid())
+  level       String
+  module      String
+  message     String   @db.Text
+  metadata    Json?
+  createdAt   DateTime @default(now())
+}
+
+model Config {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  INTERESTED
+  PAID
+  SITE_GENERATED
+  SITE_DEPLOYED
+  CLOSED
+}
+
+enum SubscriptionStatus {
+  NONE
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum OutreachStatus {
+  PENDING
+  SENT
+  DELIVERED
+  BOUNCED
+  REPLIED
+  SKIPPED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  EXPIRED
+}
+
+enum SiteStatus {
+  PENDING
+  GENERATING
+  GENERATED
+  DEPLOYING
+  DEPLOYED
+  FAILED
+}
