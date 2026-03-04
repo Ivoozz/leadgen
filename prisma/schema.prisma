@@ -34,8 +34,21 @@ model Lead {
   status          LeadStatus     @default(NEW)
   outreachStatus  OutreachStatus @default(PENDING)
 
-  domainSuggested String?
-  domainAvailable Boolean?
+  domainSuggested     String?
+  domainAvailable     Boolean?
+
+  subscriptionId      String?
+  subscriptionStatus  SubscriptionStatus @default(NONE)
+  monthlyFee          Decimal?           @db.Decimal(10, 2)
+
+  // Theory7 / DirectAdmin hosting identifiers (no raw passwords)
+  directadminUsername    String?
+  directadminServerIp    String?
+  directadminPasswordEnc String?   // AES-256-GCM encrypted
+
+  // Email provisioning
+  requestedEmailPrefixes String[]  @default([])
+  provisionedEmails      String[]  @default([])
 
   payment         Payment?
   generatedSite   GeneratedSite?
@@ -52,8 +65,10 @@ model Payment {
   leadId          String        @unique
   lead            Lead          @relation(fields: [leadId], references: [id])
 
-  molliePaymentId String?       @unique
-  stripePaymentId String?       @unique
+  molliePaymentId      String?       @unique
+  stripePaymentId      String?       @unique
+  mollieCustomerId     String?
+  mollieSubscriptionId String?
 
   amount          Decimal       @db.Decimal(10, 2)
   currency        String        @default("EUR")
@@ -125,6 +140,13 @@ enum LeadStatus {
   SITE_GENERATED
   SITE_DEPLOYED
   CLOSED
+}
+
+enum SubscriptionStatus {
+  NONE
+  ACTIVE
+  PAST_DUE
+  CANCELED
 }
 
 enum OutreachStatus {

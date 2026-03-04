@@ -4,6 +4,7 @@ import { log } from './logger'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+const FROM_ADDRESS = 'FixJeICT <info@fixjeict.nl>'
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'ivo.nipius@gmail.com'
 const DASHBOARD_DOMAIN = process.env.DASHBOARD_DOMAIN || 'localhost'
 
@@ -16,7 +17,7 @@ export async function sendAdminNotification({
 }): Promise<void> {
   try {
     await resend.emails.send({
-      from: 'LeadGen Platform <noreply@leadgen.local>',
+      from: FROM_ADDRESS,
       to: ADMIN_EMAIL,
       subject,
       text: message,
@@ -33,36 +34,75 @@ export async function sendOutreachEmail(leadId: string): Promise<void> {
   if (!lead || !lead.email) return
 
   const checkoutUrl = `https://${DASHBOARD_DOMAIN}/checkout/${leadId}`
-  const domainLine = lead.domainAvailable && lead.domainSuggested
-    ? `We noticed that ${lead.domainSuggested} is still available — we can register this for your business.`
-    : lead.domainSuggested
-    ? `We can build your website on a domain that matches your business name.`
-    : `We can build your website on a professional domain.`
+  const suggestedDomain = lead.domainSuggested ?? `${lead.businessName.toLowerCase().replace(/\s+/g, '')}.nl`
 
-  const subject = `Professional website for ${lead.businessName}`
-  const body = `Dear ${lead.businessName},
+  const subject = `Een website voor ${lead.businessName}? (Domeinnaam is nog vrij!)`
 
-We noticed that your business doesn't have a website yet. In today's digital world, having an online presence is essential to attract new customers.
+  const htmlBody = `<p>Beste eigenaar van ${lead.businessName},</p>
 
-We specialize in building modern, professional websites for local businesses. ${domainLine}
+<p>Mijn naam is Ivo van <strong>FixJeICT</strong>. Wij helpen lokale ondernemers op Goeree-Overflakkee om online beter zichtbaar te worden.</p>
 
-Your new website will include:
-- Professional design tailored to your business
-- Mobile-friendly layout
-- Contact information and location
-- Fast loading times
+<p>Tijdens het zoeken naar lokale bedrijven in de regio kwam ik ${lead.businessName} tegen. Het viel me op dat jullie prachtig werk leveren, maar dat jullie nog geen eigen website hebben. Tegenwoordig zoekt bijna iedereen via zijn of haar mobiele telefoon naar diensten in de buurt. Zonder website loopt u mogelijk nieuwe klanten uit de regio mis.</p>
 
-Get started today: ${checkoutUrl}
+<p>Ik heb direct even een check gedaan en ik zag dat de domeinnaam <strong>${suggestedDomain}</strong> nog beschikbaar is. Dat is een unieke kans om deze naam voor uw bedrijf te claimen voordat iemand anders het doet.</p>
 
-Best regards,
-LeadGen Platform`
+<p><strong>Wat kan FixJeICT voor u betekenen?</strong><br>
+Wij bieden u een volledig geautomatiseerde, stressvrije oplossing. Geen eindeloze vergaderingen of hoge eenmalige ontwikkelkosten. Voor een vast, laag bedrag per maand krijgt u van ons een professionele, moderne en mobielvriendelijke website die direct vertrouwen uitstraalt bij uw (toekomstige) klanten.</p>
+
+<p>Wat u krijgt in ons maandelijkse pakket:</p>
+<ul>
+  <li>De registratie en het beheer van <strong>${suggestedDomain}</strong>.</li>
+  <li>Een premium website, perfect leesbaar op mobiel, tablet en computer.</li>
+  <li>Snelle en veilige hosting, inclusief technisch onderhoud en updates.</li>
+</ul>
+
+<p><strong>Hoe nu verder?</strong><br>
+Alles is al voor u voorbereid. Via de onderstaande beveiligde link kunt u het domein en het maandelijkse hostingpakket direct activeren. De eerste betaling gaat veilig via iDEAL, waarna uw website direct automatisch door ons systeem wordt gebouwd en online gezet.</p>
+
+<p>👉 <strong><a href="${checkoutUrl}">Klik hier om ${suggestedDomain} te claimen en uw website te starten</a></strong></p>
+
+<p>Heeft u liever eerst even contact of heeft u specifieke wensen? Reageer dan gerust op deze e-mail, wij denken graag met u mee.</p>
+
+<p>Met vriendelijke groet,<br><br>
+<strong>Ivo</strong><br>
+FixJeICT<br>
+info@fixjeict.nl</p>`
+
+  // Plain-text fallback (required by most spam filters)
+  const textBody = `Beste eigenaar van ${lead.businessName},
+
+Mijn naam is Ivo van FixJeICT. Wij helpen lokale ondernemers op Goeree-Overflakkee om online beter zichtbaar te worden.
+
+Tijdens het zoeken naar lokale bedrijven in de regio kwam ik ${lead.businessName} tegen. Het viel me op dat jullie prachtig werk leveren, maar dat jullie nog geen eigen website hebben. Tegenwoordig zoekt bijna iedereen via zijn of haar mobiele telefoon naar diensten in de buurt. Zonder website loopt u mogelijk nieuwe klanten uit de regio mis.
+
+Ik heb direct even een check gedaan en ik zag dat de domeinnaam ${suggestedDomain} nog beschikbaar is. Dat is een unieke kans om deze naam voor uw bedrijf te claimen voordat iemand anders het doet.
+
+Wat kan FixJeICT voor u betekenen?
+Wij bieden u een volledig geautomatiseerde, stressvrije oplossing. Voor een vast, laag bedrag per maand krijgt u van ons een professionele, moderne en mobielvriendelijke website.
+
+Wat u krijgt in ons maandelijkse pakket:
+- De registratie en het beheer van ${suggestedDomain}.
+- Een premium website, perfect leesbaar op mobiel, tablet en computer.
+- Snelle en veilige hosting, inclusief technisch onderhoud en updates.
+
+Klik hier om ${suggestedDomain} te claimen en uw website te starten:
+${checkoutUrl}
+
+Heeft u liever eerst even contact? Reageer dan gerust op deze e-mail.
+
+Met vriendelijke groet,
+
+Ivo
+FixJeICT
+info@fixjeict.nl`
 
   try {
     const result = await resend.emails.send({
-      from: 'LeadGen Platform <outreach@leadgen.local>',
+      from: FROM_ADDRESS,
       to: lead.email,
       subject,
-      text: body,
+      html: htmlBody,
+      text: textBody,
     })
 
     await prisma.outreachLog.create({
@@ -70,8 +110,8 @@ LeadGen Platform`
         leadId,
         emailTo: lead.email,
         subject,
-        body,
-        resendId: result.data?.id || null,
+        body: htmlBody,
+        resendId: result.data?.id ?? null,
         status: 'sent',
       },
     })
@@ -91,7 +131,7 @@ LeadGen Platform`
         leadId,
         emailTo: lead.email,
         subject,
-        body,
+        body: htmlBody,
         status: 'failed',
       },
     })
@@ -110,8 +150,8 @@ export async function sendDeploymentNotification(leadId: string, siteUrl: string
   })
   if (!lead) return
 
-  const subject = `Site deployed for ${lead.businessName}`
-  const message = `A new website has been deployed!\n\nBusiness: ${lead.businessName}\nPayment: ${lead.payment?.amount || 'N/A'} ${lead.payment?.currency || 'EUR'} (${lead.payment?.status || 'N/A'})\nSite URL: ${siteUrl}`
+  const subject = `Website live voor ${lead.businessName}`
+  const message = `Nieuwe website is live!\n\nBedrijf: ${lead.businessName}\nBetaling: ${lead.payment?.amount ?? 'N/A'} ${lead.payment?.currency ?? 'EUR'}/maand (${lead.payment?.status ?? 'N/A'})\nAbonnement: ${lead.subscriptionStatus}\nWebsite URL: ${siteUrl}`
 
   await sendAdminNotification({ subject, message })
 }

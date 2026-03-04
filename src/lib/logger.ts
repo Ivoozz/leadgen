@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
 
 type LogLevel = 'info' | 'warn' | 'error'
@@ -16,7 +17,7 @@ export async function log(
         level,
         module,
         message,
-        metadata: metadata,
+        metadata: metadata as Prisma.InputJsonValue | undefined,
       },
     })
   } catch (err) {

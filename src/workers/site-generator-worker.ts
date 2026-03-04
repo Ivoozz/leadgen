@@ -32,13 +32,13 @@ async function processNextSite() {
 
   try {
     const aiModel = 'anthropic/claude-3.5-sonnet'
-    const prompt = `Generate a complete, modern, responsive landing page for ${lead.businessName}`
 
     const html = await generateWebsite({
       businessName: lead.businessName,
       category: lead.category,
       address: lead.address,
       phoneNumber: lead.phoneNumber,
+      domainSuggested: lead.domainSuggested,
     })
 
     await prisma.generatedSite.update({
@@ -46,7 +46,7 @@ async function processNextSite() {
       data: {
         status: 'DEPLOYING',
         aiModel,
-        aiPrompt: prompt,
+        aiPrompt: `Premium SPA for ${lead.businessName} (${lead.category ?? 'local business'}) at ${lead.address ?? 'N/A'}`,
         generatedHtml: html,
       },
     })
@@ -62,6 +62,7 @@ async function processNextSite() {
       data: {
         deployPath,
         siteUrl,
+        domain: lead.domainSuggested ?? null,
         status: 'DEPLOYED',
         deployedAt: new Date(),
       },

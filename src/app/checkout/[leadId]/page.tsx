@@ -21,6 +21,7 @@ export default async function CheckoutPage({
     businessName: lead.businessName,
     address: lead.address,
     domainSuggested: lead.domainSuggested,
+    subscriptionStatus: lead.subscriptionStatus,
     payment: lead.payment
       ? {
           status: lead.payment.status,
