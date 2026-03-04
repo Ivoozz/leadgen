@@ -12,8 +12,14 @@ interface HeaderProps {
 export default function Header({ title, description }: HeaderProps) {
   const { data: session } = useSession()
   const initials = session?.user?.name
-    ? session.user.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-    : session?.user?.email?.[0]?.toUpperCase() ?? 'A'
+    ? session.user.name
+        .split(' ')
+        .filter((n) => n.length > 0)
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2) || 'A'
+    : (session?.user?.email?.[0] ?? 'A').toUpperCase()
 
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
