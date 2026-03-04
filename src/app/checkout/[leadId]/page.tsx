@@ -5,10 +5,11 @@ import CheckoutClient from './checkout-client'
 export default async function CheckoutPage({
   params,
 }: {
-  params: { leadId: string }
+  params: Promise<{ leadId: string }>
 }) {
+  const { leadId } = await params
   const lead = await prisma.lead.findUnique({
-    where: { id: params.leadId },
+    where: { id: leadId },
     include: { payment: true },
   })
 
