@@ -16,7 +16,7 @@ export async function log(
         level,
         module,
         message,
-        metadata: metadata ? metadata : undefined,
+        metadata: metadata,
       },
     })
   } catch (err) {

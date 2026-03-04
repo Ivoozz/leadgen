@@ -16,6 +16,7 @@ function sanitizeSlug(name: string): string {
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .trim()
+    .replace(/^-+|-+$/g, '')
 }
 
 export async function deploySite(params: {
